@@ -5,6 +5,7 @@ import unittest
 import unittest.mock
 from test import support
 from test.support import socket_helper
+from test.support import threading_helper
 import socket
 import select
 import time
@@ -1268,6 +1269,25 @@ class ContextTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ctx.maximum_version = ssl.TLSVersion.TLSv1
 
+
+    @unittest.skipUnless(
+        hasattr(ssl.SSLContext, 'security_level'),
+        "requires OpenSSL >= 1.1.0"
+    )
+    def test_security_level(self):
+        ctx = ssl.SSLContext()
+        # The default security callback allows for levels between 0-5
+        # with OpenSSL defaulting to 1, however some vendors override the
+        # default value (e.g. Debian defaults to 2)
+        security_level_range = {
+            0,
+            1, # OpenSSL default
+            2, # Debian
+            3,
+            4,
+            5,
+        }
+        self.assertIn(ctx.security_level, security_level_range)
 
     @unittest.skipUnless(have_verify_flags(),
                          "verify_flags need OpenSSL > 0.9.8")
@@ -4429,7 +4449,7 @@ class TestPostHandshakeAuth(unittest.TestCase):
 
         # Ignore expected SSLError in ConnectionHandler of ThreadedEchoServer
         # (it is only raised sometimes on Windows)
-        with support.catch_threading_exception() as cm:
+        with threading_helper.catch_threading_exception() as cm:
             server = ThreadedEchoServer(context=server_context, chatty=False)
             with server:
                 with client_context.wrap_socket(socket.socket(),
@@ -4750,11 +4770,11 @@ def test_main(verbose=False):
     if support.is_resource_enabled('network'):
         tests.append(NetworkedTests)
 
-    thread_info = support.threading_setup()
+    thread_info = threading_helper.threading_setup()
     try:
         support.run_unittest(*tests)
     finally:
-        support.threading_cleanup(*thread_info)
+        threading_helper.threading_cleanup(*thread_info)
 
 if __name__ == "__main__":
     test_main()

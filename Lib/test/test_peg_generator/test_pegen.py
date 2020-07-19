@@ -493,6 +493,14 @@ class TestPegen(unittest.TestCase):
         # Would assert False without a special case in compute_left_recursives().
         make_parser(grammar)
 
+    def test_opt_sequence(self) -> None:
+        grammar = """
+        start: [NAME*]
+        """
+        # This case was failing because of a double trailing comma at the end
+        # of a line in the generated source. See bpo-41044
+        make_parser(grammar)
+
     def test_left_recursion_too_complex(self) -> None:
         grammar = """
         start: foo
@@ -538,6 +546,33 @@ class TestPegen(unittest.TestCase):
         foo: NAME
         """
         with self.assertRaises(GrammarError):
+            parser_class = make_parser(grammar)
+
+    def test_invalid_rule_name(self) -> None:
+        grammar = """
+        start: _a b
+        _a: 'a'
+        b: 'b'
+        """
+        with self.assertRaisesRegex(GrammarError, "cannot start with underscore: '_a'"):
+            parser_class = make_parser(grammar)
+
+    def test_invalid_variable_name(self) -> None:
+        grammar = """
+        start: a b
+        a: _x='a'
+        b: 'b'
+        """
+        with self.assertRaisesRegex(GrammarError, "cannot start with underscore: '_x'"):
+            parser_class = make_parser(grammar)
+
+    def test_invalid_variable_name_in_temporal_rule(self) -> None:
+        grammar = """
+        start: a b
+        a: (_x='a' | 'b') | 'c'
+        b: 'b'
+        """
+        with self.assertRaisesRegex(GrammarError, "cannot start with underscore: '_x'"):
             parser_class = make_parser(grammar)
 
 
